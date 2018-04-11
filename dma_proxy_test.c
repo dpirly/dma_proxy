@@ -16,6 +16,7 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 #include "dma_proxy.h"
+#include <unistd.h>
 
 static struct dma_proxy_channel_interface *tx_proxy_interface_p;
 static int tx_proxy_fd;

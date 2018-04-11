@@ -209,7 +209,7 @@ static void transfer(struct dma_proxy_channel *pchannel_p)
 		/* The physical address of the buffer in the interface is needed for the dma transfer
 		 * as the buffer may not be the first data in the interface
 		 */
-		u32 offset = (u32)&interface_p->buffer - (u32)interface_p;
+		size_t offset = (char*)&interface_p->buffer - (char*)interface_p;
 		pchannel_p->dma_handle = (dma_addr_t)(pchannel_p->interface_phys_addr + offset);
 	}
 
@@ -293,7 +293,7 @@ static int mmap(struct file *file_p, struct vm_area_struct *vma)
 		/* Step 3, use the DMA utility to map the DMA memory into space so that the
 		 * user space application can use it
 		 */
-		return dma_common_mmap(pchannel_p->dma_device_p, vma,
+		return dma_mmap_coherent(pchannel_p->dma_device_p, vma,
 							   pchannel_p->interface_p, pchannel_p->interface_phys_addr,
 							   vma->vm_end - vma->vm_start);
 }
@@ -450,7 +450,7 @@ static int create_channel(struct dma_proxy_channel *pchannel_p, char *name, u32 
 		dev_err(pchannel_p->dma_device_p, "DMA channel request error\n");
 		return ERROR;
 	}
-	pchannel_p->dma_device_p = &pchannel_p->channel_p->dev->device;
+	pchannel_p->dma_device_p = pchannel_p->channel_p->device->dev;
 
 	/* Initialize the character device for the dma proxy channel
 	 */
@@ -470,21 +470,21 @@ static int create_channel(struct dma_proxy_channel *pchannel_p, char *name, u32 
 		pchannel_p->interface_p = (struct dma_proxy_channel_interface *)
 			kzalloc(sizeof(struct dma_proxy_channel_interface),
 					GFP_KERNEL);
-		printk(KERN_INFO "Allocating cached memory at 0x%08X\n",
-			   (unsigned int)pchannel_p->interface_p);
+		printk(KERN_INFO "Allocating cached memory at %p\n",
+			   pchannel_p->interface_p);
 	} else {
 
 		/* Step 1, set dma memory allocation for the channel so that all of memory
 		 * is available for allocation, and then allocate the uncached memory (DMA)
 		 * for the channel interface
 		 */
-		dma_set_coherent_mask(pchannel_p->proxy_device_p, 0xFFFFFFFF);
+		dma_set_coherent_mask(pchannel_p->dma_device_p, 0xFFFFFFFF);
 		pchannel_p->interface_p = (struct dma_proxy_channel_interface *)
-			dmam_alloc_coherent(pchannel_p->proxy_device_p,
+			dmam_alloc_coherent(pchannel_p->dma_device_p,
 								sizeof(struct dma_proxy_channel_interface),
 								&pchannel_p->interface_phys_addr, GFP_KERNEL);
-		printk(KERN_INFO "Allocating uncached memory at 0x%08X\n",
-			   (unsigned int)pchannel_p->interface_p);
+		printk(KERN_INFO "Allocating uncached memory at %p\n",
+			   pchannel_p->interface_p);
 	}
 	if (!pchannel_p->interface_p) {
 		dev_err(pchannel_p->dma_device_p, "DMA allocation error\n");
